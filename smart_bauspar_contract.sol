@@ -1,7 +1,7 @@
 pragma solidity >= 0.4.0 < 0.7.0;
 
 contract Bausparvertrag {
-    //Externe Adressen
+    //Alle wichtigen e Adressen
     address payable private kollektiv = 0xdD870fA1b7C4700F2BD7f44238821C26f7392148;
     address owner;
 
@@ -56,12 +56,23 @@ contract Bausparvertrag {
         return "Neuer Inhaber hinzugefuegt.";
     }
 
-    function sparen() public payable nurInhaber {
-        kollektiv.transfer(msg.value);
-        Guthaben += (int256) (msg.value);
-        SparEingang = block.timestamp;
-        NumZahlung += 1;
-        ZahlungsHistorie[NumZahlung] = Details(msg.value,SparEingang,Phase);
+    function sparen() public payable nurInhaber returns(string memory) {
+        if (keccak256(bytes(Phase)) == keccak256(bytes('Sparphase'))) {
+            kollektiv.transfer(msg.value);
+            Guthaben += (int256) (msg.value);
+            SparEingang = block.timestamp;
+            NumZahlung += 1;
+            ZahlungsHistorie[NumZahlung] = Details(msg.value,SparEingang,Phase); 
+            return "Sparvorgang wurde erfolgreich abgeschlossen";
+        } else {
+            return "Sparen nur in Sparphase möglich";
+        }
+    }
+    
+    function auszahlen() public view nurInhaber returns(string memory){
+        if (keccak256(bytes(Phase)) == keccak256(bytes('Sparphase')) && Guthaben > 0) {
+            return "Hier von Kollektiv zurück zahlen";
+        } else {return "Auszahlung nicht möglich";}
     }
     
 
