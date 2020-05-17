@@ -1,9 +1,26 @@
 pragma solidity >= 0.4.0 < 0.7.0;
 
+contract Kollektiv {
+    address payable private constant kollektiv  = 0xdD870fA1b7C4700F2BD7f44238821C26f7392148;
+    mapping(address => address payable) BSVZuordnung;
+    
+    function addAdress(address BSVAdresse,address payable InhaberAdresse) public returns(string memory) {
+        BSVZuordnung[BSVAdresse] = InhaberAdresse;
+        return "Neue Zuordnung erfolgt!";
+    }
+    
+    function GuthabenAuszahlen(address payable InhaberAdresse,uint Guthaben) public payable returns(string memory) {
+        InhaberAdresse.transfer(Guthaben);
+        return "Guthaben wurde ausgezahlt";
+    } 
+}
+
 contract Bausparvertrag {
     //Alle wichtigen e Adressen
-    address payable private kollektiv = 0xdD870fA1b7C4700F2BD7f44238821C26f7392148;
-    address owner;
+    address payable owner;
+    address payable public constant kollektiv = 0xdD870fA1b7C4700F2BD7f44238821C26f7392148;
+    
+    Kollektiv k = Kollektiv(kollektiv);
 
     //Informationen über Vertrags-InhaberIn
     address bsv_address = address(this);
@@ -20,6 +37,7 @@ contract Bausparvertrag {
     //Bausparvertrag relevante Werte
     int private Guthaben;
     string public Phase = "Sparphase";
+    uint private Bewertungszahl = 0;
 
     //Zeitrechnung
     uint256 public NumZahlung = 0;
@@ -48,6 +66,8 @@ contract Bausparvertrag {
         Guthaben = 0 - (_summe / 1000); //Abschlussgebuehr zahlen 0.1%
         
         ZahlungsHistorie[NumZahlung] = Details(0,VertragsAbschluss,'Vertragsabschluss');
+        
+        //k.addAdress(bsv_address,owner);
     }
 
     function addInhaber(string memory _firstname,string memory _lastname) public returns(string memory) {
@@ -69,13 +89,16 @@ contract Bausparvertrag {
         }
     }
     
-    function auszahlen() public view nurInhaber returns(string memory){
+    function auszahlen() public /*payable*/ returns(string memory){
         if (keccak256(bytes(Phase)) == keccak256(bytes('Sparphase')) && Guthaben > 0) {
-            return "Hier von Kollektiv zurück zahlen";
-        } else {return "Auszahlung nicht möglich";}
+            k.GuthabenAuszahlen(owner,uint256(Guthaben));
+            return "Rückzahlung von Kollektiv erfolgreich";
+        } else {
+            return "Auszahlung nicht möglich";
+            
+        }
     }
     
-
     function KontoSaldo() public view nurInhaber returns(int){
         return Guthaben;
     }
@@ -87,5 +110,4 @@ contract Bausparvertrag {
     function posGuthaben() public view nurInhaber returns(bool){
         return Guthaben > 0;
     }
-    
 }
