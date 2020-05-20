@@ -18,6 +18,11 @@ contract MetaKollektiv {
     constructor() public payable {}
     
     function addAdress(address payable BSVAdresse,address payable InhaberAdresse) public returns(string memory) {
+        /* 
+        MetaStorage: Sobald ein neuer Bausparvertrag angelegt wird,
+        werden die Addressend des BSV und die Addresse des Eigentuemers festgehalten.
+        Neuer Bausparvertrag  wird außerdem im Array für Sparvertraege eingetragen.
+        */
         BSVZuordnung[BSVAdresse] = InhaberAdresse;
         Vertreage.push(BSVAdresse);
         Sparphase.push(BSVAdresse);
@@ -88,7 +93,7 @@ contract Bausparvertrag {
         uint256 _Zahlung;
         uint256 _Zeitpunkt;
         string _ZustandVertrag;
-        int256 _ProzEingezahlt;
+        fixed _ProzEingezahlt;
     }
     mapping(uint => Details) public ZahlungsHistorie;
 
@@ -120,12 +125,23 @@ contract Bausparvertrag {
     }
 
     function sparen() public payable nurInhaber returns(string memory) {
+        /*
+        Sparvorgang: Zahlung von Sparraten an das Kollektiv.
+        Sparen ist grundsätzlich nur in der Phase 'Sparphase' möglich.
+        Zahlungen und Details zur Zahlung werden protokolliert
+        */
         if (keccak256(bytes(Phase)) == keccak256(bytes('Sparphase'))) {
             address(k).transfer(msg.value);
             Guthaben += (int256) (msg.value);
             SparEingang = block.timestamp;
             NumZahlung += 1;
-            ZahlungsHistorie[NumZahlung] = Details(msg.value,SparEingang,Phase,(Guthaben / BausparSumme)*100); 
+            
+            fixed Proz = 0;
+            if (Guthaben > 0) {
+                Proz = (fixed(Guthaben) / fixed(BausparSumme));
+            }
+            
+            ZahlungsHistorie[NumZahlung] = Details(msg.value,SparEingang,Phase,Proz); 
             return "Sparvorgang wurde erfolgreich abgeschlossen";
         } else {
             return "Sparen nur in Sparphase möglich";
@@ -133,6 +149,11 @@ contract Bausparvertrag {
     }
     
     function auszahlen() public payable nurInhaber returns(string memory){
+        /* 
+        Vertragsguthaben vorzeitig ausszahlen lassen (ohne Anspruch auf Darlehen)
+        Dabei wird das Guthaben des Vertrages an die Besitzer Adresse erstattet. 
+        Vertrag wird bereinigt und auf 'null' gesetzt.
+        */
         if (keccak256(bytes(Phase)) == keccak256(bytes('Sparphase')) && Guthaben > 0) {
             k.GuthabenAuszahlen(bsv_address,uint(Guthaben));
             Phase = 'Ausbezahlt';
@@ -144,6 +165,8 @@ contract Bausparvertrag {
             return "Auszahlung nicht möglich";
         }
     }
+    
+    /*Getter Funktionen vom Vertrag definiert*/
     
     function KontoSaldo() public view nurInhaber returns(int){
         return Guthaben;
