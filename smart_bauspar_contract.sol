@@ -13,7 +13,7 @@ contract MetaKollektiv {
     address[] Sparphase;
     address[] Kreditphase;
     
-    uint256 Kreditvolumen;
+    uint256 MetaKreditvolumen;
     
     struct VertragsDetails {
         uint256 Sparguthaben;
@@ -24,7 +24,7 @@ contract MetaKollektiv {
     mapping(address => VertragsDetails) VertragInfo; 
     
     constructor() public payable {
-        Kreditvolumen = 0;
+        MetaKreditvolumen = 0;
     }
     
     function HinzfuegenAddresse(address payable BSVAdresse,address payable InhaberAdresse) public returns(string memory) {
@@ -62,15 +62,21 @@ contract MetaKollektiv {
         VertragInfo[BSVAdresse] = VertragsDetails(VertragInfo[BSVAdresse].Sparguthaben + SparrateEingang,0,0);
     }
     
-    function kollektivTilgen(address payable BSVAdresse,uint KreditVolumen,uint KreditRaten) external payable {
+    function kollektivTilgen(address payable BSVAdresse,uint KreditVolumen,uint KreditRaten) external {
         /*
         Funktion wird von Bausparvertrag aufgerufen (nach jeder Kredit/ Tilgen-Transaktion, 
         um im kollektiv Uberblick zu haben, welcher Vertrag in welchem Umfang getilgt hat hat.
         */
         VertragInfo[BSVAdresse] = VertragsDetails(0,KreditVolumen,VertragInfo[BSVAdresse].Kreditraten + KreditRaten);
+        MetaKreditvolumen -= KreditRaten;
     }
 
     function GuthabenAuszahlen(address payable BSVAdresse,uint Auszahlung) external payable {
+        /*
+        Pruefen ob der Vertrag auch zu einer Kreditauszahlung berechtigt ist
+        und ob genügend Liquiditiät im Kollektiv vorhanden ist.
+        Erst dann erfolgt eine Auszahlung.
+        */
         require(Zugriffsberechtigung(BSVAdresse) == true,"Keine Berechtigung zum Zugriff");
         Bausparvertrag bsv = Bausparvertrag(BSVAdresse);
         require(address(this).balance > 0,"Nicht ausreichend Liquiditaet im kollektiv");
@@ -90,7 +96,7 @@ contract MetaKollektiv {
         }
     }
     
-    function KreditAuszahlen(address payable BSVAdresse,uint Auszahlung) external payable returns(string memory) {
+    function KreditAuszahlen(address payable BSVAdresse,uint Auszahlung) external payable {
         /*
         Pruefen ob der Vertrag auch zu einer Kreditauszahlung berechtigt ist
         und ob genügend Liquiditiät im Kollektiv vorhanden ist.
@@ -98,14 +104,13 @@ contract MetaKollektiv {
         */
         require(Zugriffsberechtigung(BSVAdresse) == true,"Keine Berechtigung zum Zugriff");
         Bausparvertrag bsv = Bausparvertrag(BSVAdresse);
-        require(bsv.ZuteilungsReife()==true);
         require(address(this).balance > 0,"Nicht ausreichend Liquiditaet im kollektiv");
         BSVZuordnung[address(bsv)].transfer(Auszahlung);
         /* 
         Umschluesselung von Sparphase auf Kreditphase
         nach erfolgreicher Auszahlung.
         */
-        Kreditvolumen += Auszahlung;
+        MetaKreditvolumen += Auszahlung;
         
         bool loop = false;
         uint i = 0;
@@ -119,7 +124,7 @@ contract MetaKollektiv {
     }
     
     function getMetadata() public view returns(uint,uint,uint,uint,uint) {
-        return (Vertreage.length,Sparphase.length,Kreditphase.length,address(this).balance,Kreditvolumen);
+        return (Vertreage.length,Sparphase.length,Kreditphase.length,address(this).balance,MetaKreditvolumen);
     }
     
     function getVertrag(address BSVAdresse) public view returns(address) {
@@ -257,7 +262,7 @@ contract Bausparvertrag {
         } else return false;
     }
     
-    function KreditAntrag() public payable nurInhaber returns(string memory) {
+    function KreditAntrag() public payable nurInhaber returns(uint) {
         /*
         Sobald ZuteilungsReife erfüllt ist, kann das restliche Volumen aus dem 
         Bausparvertrag als Kredit beantragt werden. (Bausparsumme abzgl. des bisher gesparten
@@ -266,20 +271,28 @@ contract Bausparvertrag {
         if (ZuteilungsReife() == true) {
             Phase = 'Kreditphase';
             Kreditsumme = int(BausparSumme) - Guthaben;
-            k.KreditAuszahlen(bsv_address,uint(Kreditsumme + Guthaben));
+            uint Auszahlung = uint(Kreditsumme) + uint(Guthaben);
+            k.KreditAuszahlen(bsv_address,Auszahlung);
             Guthaben = 0;
-            k.kollektivTilgen(bsv_address,uint(Kreditsumme),0);
+            //k.kollektivTilgen(bsv_address,uint(Kreditsumme),0);
             
-            return "Auszahlung Guthaben inkl. Kredit erfolgreich durchgeführt.";
+            //return "Auszahlung Guthaben inkl. Kredit erfolgreich durchgeführt.";
+            return Auszahlung;
         }
     }
     
-    function KreditTilgen() public payable nurInhaber {
-        require(keccak256(bytes(Phase)) == keccak256(bytes('Kreditphase')),"Tigen nur in der Kreditphase möglich");
+    function KreditTilgen() public payable nurInhaber returns(int) {
+        /*
+        In der Kreditphase
+        
+        */
+        require(keccak256(bytes(Phase)) == keccak256(bytes('Kreditphase')),"Tilgen nur in der Kreditphase möglich");
         
         address(k).transfer(msg.value);
         Kreditsumme -= Kreditsumme - int(msg.value);
         k.kollektivTilgen(bsv_address,uint(Kreditsumme),msg.value);
+        
+        return Kreditsumme;
         
     }
     
