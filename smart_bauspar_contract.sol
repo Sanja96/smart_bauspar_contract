@@ -284,20 +284,23 @@ contract Bausparvertrag {
         require(keccak256(bytes(Phase)) == keccak256(bytes('Kreditphase')),"Tilgen nur in der Kreditphase möglich");
         
         address(k).transfer(msg.value);
-        Kreditsumme -= Kreditsumme - int(msg.value);
+        Kreditsumme -= int(msg.value);
         NumZahlung += 1;
-        if (Kreditsumme <= 0) { Phase = 'Ausbezahlt'; }
+        if (int(Kreditsumme) <= 0) { Phase = 'Ausbezahlt'; }
         ZahlungsHistorie[NumZahlung] = Details(uint(Kreditsumme),block.timestamp,Phase);
         k.kollektivTilgen(bsv_address,uint(Kreditsumme),msg.value);
         
         return Kreditsumme;
-        
     }
     
     /*Getter Funktionen vom Vertrag definiert*/
     
     function KontoSaldo() public view nurInhaber returns(int){
-        return Guthaben;
+        if (keccak256(bytes(Phase)) == keccak256(bytes('Sparphase'))) {
+            return Guthaben;
+        } else if (keccak256(bytes(Phase)) == keccak256(bytes('Kreditphase'))) {
+            return Kreditsumme;
+        } else return 0;
     }
     
     function getKollektiv() public view nurInhaber returns(uint256){
