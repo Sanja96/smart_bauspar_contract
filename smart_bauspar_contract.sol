@@ -262,7 +262,7 @@ contract Bausparvertrag {
         } else return false;
     }
     
-    function KreditAntrag() public payable nurInhaber returns(uint) {
+    function KreditAntrag() public payable nurInhaber returns(string memory) {
         /*
         Sobald ZuteilungsReife erfüllt ist, kann das restliche Volumen aus dem 
         Bausparvertrag als Kredit beantragt werden. (Bausparsumme abzgl. des bisher gesparten
@@ -274,22 +274,20 @@ contract Bausparvertrag {
             uint Auszahlung = uint(Kreditsumme) + uint(Guthaben);
             k.KreditAuszahlen(bsv_address,Auszahlung);
             Guthaben = 0;
-            //k.kollektivTilgen(bsv_address,uint(Kreditsumme),0);
+            k.kollektivTilgen(bsv_address,uint(Kreditsumme),0);
             
-            //return "Auszahlung Guthaben inkl. Kredit erfolgreich durchgeführt.";
-            return Auszahlung;
+            return "Auszahlung Guthaben inkl. Kredit erfolgreich durchgeführt.";
         }
     }
     
     function KreditTilgen() public payable nurInhaber returns(int) {
-        /*
-        In der Kreditphase
-        
-        */
         require(keccak256(bytes(Phase)) == keccak256(bytes('Kreditphase')),"Tilgen nur in der Kreditphase möglich");
         
         address(k).transfer(msg.value);
         Kreditsumme -= Kreditsumme - int(msg.value);
+        NumZahlung += 1;
+        if (Kreditsumme <= 0) { Phase = 'Ausbezahlt'; }
+        ZahlungsHistorie[NumZahlung] = Details(uint(Kreditsumme),block.timestamp,Phase);
         k.kollektivTilgen(bsv_address,uint(Kreditsumme),msg.value);
         
         return Kreditsumme;
