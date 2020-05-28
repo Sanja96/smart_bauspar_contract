@@ -23,8 +23,11 @@ contract MetaKollektiv {
     
     mapping(address => VertragsDetails) VertragInfo; 
     
+    uint256 SparToKredit;
+    
     constructor() public payable {
         MetaKreditvolumen = 0;
+        SparToKredit = 0;
     }
     
     function HinzfuegenAddresse(address payable BSVAdresse,address payable InhaberAdresse) public returns(string memory) {
@@ -68,7 +71,7 @@ contract MetaKollektiv {
         um im kollektiv Uberblick zu haben, welcher Vertrag in welchem Umfang getilgt hat hat.
         */
         VertragInfo[BSVAdresse] = VertragsDetails(0,KreditVolumen,VertragInfo[BSVAdresse].Kreditraten + KreditRaten);
-        MetaKreditvolumen -= KreditRaten;
+        MetaKreditvolumen = MetaKreditvolumen - KreditRaten;
     }
 
     function GuthabenAuszahlen(address payable BSVAdresse,uint Auszahlung) external payable {
@@ -90,7 +93,10 @@ contract MetaKollektiv {
         uint i = 0;
         while(!loop) {
             if (Sparphase[i] == BSVAdresse) {
-                delete Sparphase[i];
+                //Swap and Delete
+                Sparphase[i] = Sparphase[Sparphase.length - 1];
+                delete Sparphase[Sparphase.length - 1];
+                SparToKredit += 1;
                 loop = true;
             } else i++;
         }
@@ -117,14 +123,17 @@ contract MetaKollektiv {
         while(!loop) {
             if (Sparphase[i] == BSVAdresse) {
                 Kreditphase.push(Sparphase[i]);
-                delete Sparphase[i];
+                //Swap and Delete
+                Sparphase[i] = Sparphase[Sparphase.length - 1];
+                delete Sparphase[Sparphase.length - 1];
+                SparToKredit += 1;
                 loop = true;
             } else i++;
         }
     }
     
     function getMetadata() public view returns(uint,uint,uint,uint,uint) {
-        return (Vertreage.length,Sparphase.length,Kreditphase.length,address(this).balance,MetaKreditvolumen);
+        return (Vertreage.length,(Sparphase.length-SparToKredit),Kreditphase.length,address(this).balance,MetaKreditvolumen);
     }
     
     function getVertrag(address BSVAdresse) public view returns(address) {
@@ -281,6 +290,11 @@ contract Bausparvertrag {
     }
     
     function KreditTilgen() public payable nurInhaber returns(int) {
+        /*
+        Solange die Kreditsumme größer als 0 ist, befindet sich der Vertrag in der Kreditphase.
+        Hierfür müssen Zahlungen an das Kollektiv fließen, um die Kreditsumme zu senken.
+        Erst wenn die Kreditsumme kleiner/gleich Null ist, wechselt der Vertrag in die Phase "Zurückgezahlt".
+        */
         require(keccak256(bytes(Phase)) == keccak256(bytes('Kreditphase')),"Tilgen nur in der Kreditphase möglich");
         
         address(k).transfer(msg.value);
@@ -289,6 +303,10 @@ contract Bausparvertrag {
         if (int(Kreditsumme) <= 0) { Phase = 'Ausbezahlt'; }
         ZahlungsHistorie[NumZahlung] = Details(uint(Kreditsumme),block.timestamp,Phase);
         k.kollektivTilgen(bsv_address,uint(Kreditsumme),msg.value);
+        
+        if (Kreditsumme <= 0) {
+            Phase = 'Zurueckgezahlt';
+        }
         
         return Kreditsumme;
     }
