@@ -4,15 +4,20 @@ pragma solidity >0.6.0 <= 0.7.0;
 
 contract MetaKollektiv {
     /*
-    In den Zeilen 11-14 werden mapping und arrays definiert, die die Vertreage
+    In den folgenden Zeilen werden Eigenschaften definiert, die die Vertreage
     aus dem Kollektiv beinhalten. Je nach Status des Vertrags kann dieser unterschiedlichen 
     Arrays zugeordnet werden. 
+    
+    Informationen über die Anzahl an Verträgen, die sich in einer bestimmten Phase befinden.
     */
     mapping(address => address payable) private BSVZuordnung;
     address[] Vertreage;
     address[] Sparphase;
     address[] Kreditphase;
     
+    /*
+    Informationen über die Liquiditiät wie/wo diese verwendet wird.
+    */
     uint256 MetaKreditvolumen;
     
     struct VertragsDetails {
@@ -26,6 +31,7 @@ contract MetaKollektiv {
     uint256 SparToKredit;
     
     constructor() public payable {
+        //Initialisierung der Werte, bei Erstellung des Kollektivs.
         MetaKreditvolumen = 0;
         SparToKredit = 0;
     }
@@ -149,6 +155,8 @@ contract MetaKollektiv {
 contract Bausparvertrag {
     //Alle wichtigen e Adressen
     address payable owner;
+        /* Referenz auf das Kollektiv. Diese Adresse stellt das Kollektiv dar,
+        das alle Bausparverträge steuert*/
     address payable _metakollektiv = 0x3643b7a9F6338115159a4D3a2cc678C99aD657aa;
 
     //Informationen über Vertrags-InhaberIn
